@@ -1,0 +1,64 @@
+﻿{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.14/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.14",
+  "version": "1.0.0",
+  "id": "28cd7ef5-359c-4c5d-8b2e-081e44e62def",
+  "packageName": "com.example.workflowtimebot",
+  "developer": {
+    "name": "Your Company",
+    "websiteUrl": "https://yourcompany.com",
+    "privacyUrl": "https://yourcompany.com/privacy",
+    "termsOfUseUrl": "https://yourcompany.com/terms"
+  },
+  "icons": {
+    "color": "icon-color.png",
+    "outline": "icon-outline.png"
+  },
+  "name": {
+    "short": "WorkflowTimeBot",
+    "full": "Workflow Time Bot"
+  },
+  "description": {
+    "short": "A bot to assist with workflow tasks",
+    "full": "This bot helps users manage workflows and interact with tasks in Microsoft Teams."
+  },
+  "accentColor": "#FFFFFF",
+  "bots": [
+    {
+      "botId": "28cd7ef5-359c-4c5d-8b2e-081e44e62def",
+      "scopes": [
+        "personal",
+        "team",
+        "groupchat"
+      ],
+      "commandLists": [
+        {
+          "scopes": [ "personal", "team", "groupchat" ],
+          "commands": [
+            {
+              "title": "/help",
+              "description": "Shows help information"
+            },
+            {
+              "title": "/work",
+              "description": "Manage your work session"
+            },
+            {
+              "title": "/echo",
+              "description": "Echoes back your message"
+            }
+          ]
+        }
+      ],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "living-joey-clear.ngrok-free.app"
+  ]
+}

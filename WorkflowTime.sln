@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35506.116
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkflowTime", "WorkflowTime\WorkflowTime.csproj", "{435CCA8C-2D90-4F6B-8CFB-1AF8E28A07ED}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorkflowTime.Test", "WorkflowTime.Test\WorkflowTime.Test.csproj", "{6556E90F-18B8-450F-9C23-C4FF6EC40C0F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{435CCA8C-2D90-4F6B-8CFB-1AF8E28A07ED} = {435CCA8C-2D90-4F6B-8CFB-1AF8E28A07ED}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{435CCA8C-2D90-4F6B-8CFB-1AF8E28A07ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{435CCA8C-2D90-4F6B-8CFB-1AF8E28A07ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{435CCA8C-2D90-4F6B-8CFB-1AF8E28A07ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{435CCA8C-2D90-4F6B-8CFB-1AF8E28A07ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6556E90F-18B8-450F-9C23-C4FF6EC40C0F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6556E90F-18B8-450F-9C23-C4FF6EC40C0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6556E90F-18B8-450F-9C23-C4FF6EC40C0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6556E90F-18B8-450F-9C23-C4FF6EC40C0F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {11EA416E-2CD4-4F92-9FDA-8D79FC7EC75E}
+	EndGlobalSection
+EndGlobal

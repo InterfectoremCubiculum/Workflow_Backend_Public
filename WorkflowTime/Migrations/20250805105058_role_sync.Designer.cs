@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WorkflowTime.Database;
 
@@ -11,9 +12,11 @@ using WorkflowTime.Database;
 namespace WorkflowTime.Migrations
 {
     [DbContext(typeof(WorkflowTimeDbContext))]
-    partial class WorkflowTimeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250805105058_role_sync")]
+    partial class role_sync
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -187,6 +190,9 @@ namespace WorkflowTime.Migrations
                     b.Property<int?>("TeamId")
                         .HasColumnType("int");
 
+                    b.Property<string>("TeamsConversationId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ProjectId");
@@ -203,9 +209,6 @@ namespace WorkflowTime.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<int?>("DurationInSeconds")
                         .ValueGeneratedOnAddOrUpdate()

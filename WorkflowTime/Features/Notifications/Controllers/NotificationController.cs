@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using WorkflowTime.Features.Notifications.Services;
 using WorkflowTime.Features.UserManagement.Services;
 
@@ -52,6 +53,13 @@ namespace WorkflowTime.Features.Notifications.Controllers
         {
             await _notificationService.MarkNotifications(notificationsIds);
             return NoContent();
+        }
+
+        [HttpPost("UserStatusUpdate")]
+        public async Task<IActionResult> Post([FromBody] JsonElement data)
+        {
+            Console.WriteLine("Received notification: " + data.ToString());
+            return Ok();
         }
     }
 }

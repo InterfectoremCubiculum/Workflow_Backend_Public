@@ -5,10 +5,11 @@ using NJsonSchema;
 using OpenAI.Chat;
 using Polly;
 using Polly.Registry;
+using System;
 using System.Text.Json;
 using WorkflowTime.Configuration;
 
-namespace WorkflowTime.Features.Bot.Services.AI
+namespace WorkflowTime.Features.Teams.Bot.Services.AI
 {
     public class OpenAiWorkflowAnalyzer : IWorkflowAnalyzer
     {
@@ -48,7 +49,7 @@ namespace WorkflowTime.Features.Bot.Services.AI
                     "Use standard .NET TimeSpan format for durations (e.g., 00:05:00 for 5 minutes), not ISO 8601." +
                     "extract the start and end times using ISO 8601 format (e.g., 2025-07-24T08:00:00)." +
                     "Always respond strictly according to the schema." +
-                    "If date not provided uset this is: " + DateTime.Now),
+                    "If date not provided use this day which is actual time: " + DateTime.UtcNow.ToString("s")),
                 new UserChatMessage(inputText),
             ];
 
@@ -58,7 +59,7 @@ namespace WorkflowTime.Features.Bot.Services.AI
 
             var requestOptions = new ChatCompletionOptions()
             {
-                MaxOutputTokenCount = 512,
+                MaxOutputTokenCount = 1024,
                 Temperature = 0.15f,
                 FrequencyPenalty = 0.0f,
                 PresencePenalty = 0.0f,

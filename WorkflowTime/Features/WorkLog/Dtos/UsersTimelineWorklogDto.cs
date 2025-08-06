@@ -10,5 +10,7 @@ namespace WorkflowTime.Features.WorkLog.Dtos
         public DateTime? EndTime { get; set; }
         public int? DurationInSeconds { get; set; }
         public Guid UserId { get; set; }
+        public bool RequestAction { get; set; } = false;
+        public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

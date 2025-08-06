@@ -15,9 +15,6 @@ namespace WorkflowTime.Features.Summary.Validators
             RuleFor(x => x.PeriodEnd)
                 .NotEmpty()
                 .WithMessage("Period end date is required.");
-            RuleFor(x => x.UserIds)
-                .NotEmpty()
-                .WithMessage("User ID is required.");
         }
     }
 }

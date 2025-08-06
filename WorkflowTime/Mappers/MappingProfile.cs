@@ -1,12 +1,13 @@
 ﻿using AutoMapper;
 using Microsoft.Graph.Models;
-using WorkflowTime.Features.Bot.Services.AI;
 using WorkflowTime.Features.DayOffs.Dtos;
 using WorkflowTime.Features.DayOffs.Models;
 using WorkflowTime.Features.Notifications;
 using WorkflowTime.Features.Notifications.Models;
 using WorkflowTime.Features.ProjectManagement.Models;
 using WorkflowTime.Features.Summary.Dtos;
+using WorkflowTime.Features.Teams.Bot.Services.AI;
+using WorkflowTime.Features.Teams.Graph;
 using WorkflowTime.Features.UserManagement.Dtos;
 using WorkflowTime.Features.UserManagment.Models;
 using WorkflowTime.Features.WorkLog.Dtos;
@@ -58,6 +59,10 @@ namespace WorkflowTime.Mappers
             CreateMap<UserCacheDto, GetUsersByGuidDto>()
                 .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.GivenName));
+
+            CreateMap<Presence, UserPresenceDto>()
+                .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Availability));
         }
     }
 }

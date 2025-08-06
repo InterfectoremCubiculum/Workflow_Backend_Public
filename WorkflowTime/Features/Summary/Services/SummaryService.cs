@@ -1,4 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CsvHelper;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using WorkflowTime.Database;
 using WorkflowTime.Enums;
 using WorkflowTime.Features.Summary.Dtos;
@@ -15,65 +18,187 @@ namespace WorkflowTime.Features.Summary.Services
         }
         public async Task<List<UserWorkSummaryDto>> GetProjectsWorkSummary(ProjectsWorkSummaryQueriesParameters parameters)
         {
-            var projectUserMap = await _dbContext.Projects
-                .Where(p => parameters.ProjectIds.Contains(p.Id) && !p.IsDeleted)
-                .Select(p => new
-                {
-                    p.Id,
-                    p.Name,
-                    UserIds = p.Users
-                        .Where(u => !u.IsDeleted)
-                        .Select(u => u.Id)
-                        .ToList()
-                })
-                .ToListAsync();
-
-            var allUserIds = projectUserMap.SelectMany(p => p.UserIds).ToList();
-
-            var userWorkSummaries = await GetUserWorkSummariesForUsers(new UserWorkSummaryQueriesParameters
+            return await GetUserWorkSummariesForUsers(new UserWorkSummaryQueriesParameters
             {
-                UserIds = allUserIds,
+                UserIds = await MapProjetcsUsersIds(parameters.ProjectIds),
                 PeriodStart = parameters.PeriodStart,
                 PeriodEnd = parameters.PeriodEnd
             });
-
-            return userWorkSummaries;
         }
 
-        public async Task<List<UserWorkSummaryDto>> GetTeamsWorkSummary(TeamsWorkSummaryQueriesParameters parameters)
+        public async Task<List<UserWorkSummaryDayByDayDto>> GetProjectsWorkSummaryDayByDay(ProjectsWorkSummaryQueriesParameters parameters)
         {
-            var teamUserMap = await _dbContext.Teams
-                .Where(t => parameters.TeamIds.Contains(t.Id) && !t.IsDeleted)
-                .Select(t => new
-                {
-                    t.Id,
-                    t.Name,
-                    UserIds = t.Users
-                        .Where(u => !u.IsDeleted)
-                        .Select(u => u.Id)
-                        .ToList()
-                })
-                .ToListAsync();
-
-            var allUserIds = teamUserMap.SelectMany(t => t.UserIds).ToList();
-
-            var userWorkSummaries = await GetUserWorkSummariesForUsers(new UserWorkSummaryQueriesParameters
+            return await GetUserWorkSummariesDayByDayForUsers(new UserWorkSummaryQueriesParameters
             {
-                UserIds = allUserIds,
+                UserIds = await MapProjetcsUsersIds(parameters.ProjectIds),
                 PeriodStart = parameters.PeriodStart,
                 PeriodEnd = parameters.PeriodEnd
             });
 
-            return userWorkSummaries;
+        }
+        private async Task<List<Guid>> MapProjetcsUsersIds(List<int> projectsIds)
+        {
+            List<Guid> userIds;
+
+            if (projectsIds.Count == 0)
+            {
+                userIds = await _dbContext.Projects
+                    .Where(p => !p.IsDeleted)
+                    .SelectMany(p => p.Users
+                        .Where(u => !u.IsDeleted)
+                        .Select(u => u.Id))
+                    .Distinct()
+                    .ToListAsync();
+            }
+            else
+            {
+                userIds = await _dbContext.Projects
+                    .Where(p => projectsIds.Contains(p.Id) && !p.IsDeleted)
+                    .SelectMany(p => p.Users
+                        .Where(u => !u.IsDeleted)
+                        .Select(u => u.Id))
+                    .Distinct()
+                    .ToListAsync();
+            }
+
+            return userIds;
+        }
+        public async Task<List<UserWorkSummaryDto>> GetTeamsWorkSummary(TeamsWorkSummaryQueriesParameters parameters)
+        {
+            return await GetUserWorkSummariesForUsers(new UserWorkSummaryQueriesParameters
+            {
+                UserIds = await MapTeamsUsersIds(parameters.TeamIds),
+                PeriodStart = parameters.PeriodStart,
+                PeriodEnd = parameters.PeriodEnd
+            });
+        }
+        public async Task<List<UserWorkSummaryDayByDayDto>> GetTeamsWorkSummarDayByDay(TeamsWorkSummaryQueriesParameters parameters)
+        {
+            return await GetUserWorkSummariesDayByDayForUsers(new UserWorkSummaryQueriesParameters
+            {
+                UserIds = await MapTeamsUsersIds(parameters.TeamIds),
+                PeriodStart = parameters.PeriodStart,
+                PeriodEnd = parameters.PeriodEnd
+            });
+        }
+        private async Task<List<Guid>> MapTeamsUsersIds(List<int> teamIds)
+        {
+            List<Guid> userIds;
+
+            if (teamIds.Count == 0)
+            {
+                userIds = await _dbContext.Projects
+                    .Where(p => !p.IsDeleted)
+                    .SelectMany(p => p.Users
+                        .Where(u => !u.IsDeleted)
+                        .Select(u => u.Id))
+                    .Distinct()
+                    .ToListAsync();
+            }
+            else
+            {
+                userIds = await _dbContext.Projects
+                    .Where(p => teamIds.Contains(p.Id) && !p.IsDeleted)
+                    .SelectMany(p => p.Users
+                        .Where(u => !u.IsDeleted)
+                        .Select(u => u.Id))
+                    .Distinct()
+                    .ToListAsync();
+            }
+
+            return userIds;
+        }
+        public async Task<List<UserWorkSummaryDayByDayDto>> GetWorkSummariesDayByDayForUsers(UserWorkSummaryQueriesParameters parameters)
+        {
+            if(parameters.UserIds.Count == 0)
+            {
+                parameters.UserIds = await _dbContext.Users
+                    .Where(u => !u.IsDeleted)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+            }
+
+            var summaries = await GetUserWorkSummariesDayByDayForUsers(parameters);
+            return summaries;
+        }
+
+        private async Task<List<UserWorkSummaryDayByDayDto>> GetUserWorkSummariesDayByDayForUsers(UserWorkSummaryQueriesParameters parameters)
+        {
+            var userIds = parameters.UserIds;
+            var periodStart = parameters.PeriodStart.ToDateTime(TimeOnly.MinValue);
+            var periodEnd = parameters.PeriodEnd.ToDateTime(TimeOnly.MaxValue);
+
+            var timeSegments = await _dbContext.TimeSegments
+                .Where(ts => userIds.Contains(ts.UserId)
+                    && ts.StartTime >= periodStart
+                    && ts.EndTime <= periodEnd
+                    && !ts.IsDeleted)
+                .ToListAsync();
+
+            var users = await _dbContext.Users
+                .Where(u => userIds.Contains(u.Id) && !u.IsDeleted)
+                .Include(u => u.Project)
+                .Include(u => u.Team)
+                .ToListAsync();
+
+            var allDates = Enumerable.Range(0, (parameters.PeriodEnd.DayNumber - parameters.PeriodStart.DayNumber) + 1)
+                .Select(offset => parameters.PeriodStart.AddDays(offset))
+                .ToList();
+
+            var result = new List<UserWorkSummaryDayByDayDto>();
+
+            foreach (var user in users)
+            {
+                foreach (var date in allDates)
+                {
+                    var dayStart = date.ToDateTime(TimeOnly.MinValue);
+                    var dayEnd = date.ToDateTime(TimeOnly.MaxValue);
+
+                    var userDaySegments = timeSegments
+                        .Where(ts => ts.UserId == user.Id && ts.StartTime >= dayStart && ts.EndTime <= dayEnd)
+                        .ToList();
+
+                    var workMinutes = userDaySegments
+                        .Where(ts => ts.TimeSegmentType == TimeSegmentType.Work)
+                        .Sum(ts => ts.DurationInSeconds ?? 0) / 60;
+
+                    var breakMinutes = userDaySegments
+                        .Where(ts => ts.TimeSegmentType == TimeSegmentType.Break)
+                        .Sum(ts => ts.DurationInSeconds ?? 0) / 60;
+
+                    result.Add(new UserWorkSummaryDayByDayDto
+                    {
+                        UserId = user.Id,
+                        Name = user.GivenName,
+                        Surname = user.Surname,
+                        Email = user.Email,
+                        Date = date,
+                        ProjectName = user.Project != null ? user.Project.Name : string.Empty,
+                        TeamName = user.Team != null ? user.Team.Name : string.Empty,
+                        WorkMinutes = workMinutes,
+                        BreakMinutes = breakMinutes
+                    });
+                }
+            }
+
+            return result;
         }
 
         public async Task<List<UserWorkSummaryDto>> GetWorkSummariesForUsers(UserWorkSummaryQueriesParameters parameters)
         {
+            if (parameters.UserIds.Count == 0)
+            {
+                parameters.UserIds = await _dbContext.Users
+                    .Where(u => !u.IsDeleted)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+            }
+
             var summaries = await GetUserWorkSummariesForUsers(parameters);
             return summaries;
         }
 
-        public async Task<List<UserWorkSummaryDto>> GetUserWorkSummariesForUsers(UserWorkSummaryQueriesParameters parameters)
+        private async Task<List<UserWorkSummaryDto>> GetUserWorkSummariesForUsers(UserWorkSummaryQueriesParameters parameters)
         {
             var userIds = parameters.UserIds;
             var periodStart = parameters.PeriodStart.ToDateTime(TimeOnly.MinValue);
@@ -93,9 +218,6 @@ namespace WorkflowTime.Features.Summary.Services
                     && dor.StartDate >= parameters.PeriodStart
                     && dor.EndDate <= parameters.PeriodEnd
                     && !dor.IsDeleted);
-
-            var projectsQuery = _dbContext.Projects
-                .Where(p => p.Users.Any(u => userIds.Contains(u.Id)) && !p.IsDeleted);
 
             var summaries = await usersQuery
                 .Select(user => new UserWorkSummaryDto
@@ -129,6 +251,36 @@ namespace WorkflowTime.Features.Summary.Services
                 .ToListAsync();
 
             return summaries;
+        }
+
+        public async Task<FileResult> ExportToCSV(UserWorkSummaryQueriesParameters parameters)
+        {
+            IEnumerable<object> summaries;
+            if (parameters.UserIds.Count == 0)
+            {
+                parameters.UserIds = await _dbContext.Users
+                    .Where(u => !u.IsDeleted)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+            }
+
+            if (parameters.IsDayByDay)
+                summaries = await GetUserWorkSummariesDayByDayForUsers(parameters);
+            else
+                summaries = await GetUserWorkSummariesForUsers(parameters);
+
+            var memoryStream = new MemoryStream();
+            using (var writer = new StreamWriter(memoryStream, leaveOpen: true))
+            using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+            {
+                csv.WriteRecords(summaries);
+            }
+            memoryStream.Position = 0;
+            var fileName = $"Summary_From_{parameters.PeriodStart:yyyy-MM-dd}_To_{parameters.PeriodEnd:yyyy-MM-dd}.csv";
+            return new FileStreamResult(memoryStream, "text/csv")
+            {
+                FileDownloadName = fileName
+            };
         }
     }
 }

@@ -7,7 +7,6 @@ using WorkflowTime.Exceptions;
 using WorkflowTime.Features.DayOffs.Dtos;
 using WorkflowTime.Features.DayOffs.Models;
 using WorkflowTime.Features.DayOffs.Queries;
-using WorkflowTime.Features.UserManagement.Services;
 using WorkflowTime.Utillity;
 
 namespace WorkflowTime.Features.DayOffs.Services

@@ -1,11 +1,5 @@
-﻿using Microsoft.Bot.Builder.Integration.AspNet.Core;
-using Microsoft.Bot.Schema;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Polly;
-using Polly.Registry;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
-using WorkflowTime.Configuration;
 using WorkflowTime.Database;
 using WorkflowTime.Enums;
 using WorkflowTime.Features.Notifications.Models;
@@ -16,37 +10,20 @@ namespace WorkflowTime.Features.NotificationsTeams
     public class WorkLogNotificationJob
     {
         private readonly WorkflowTimeDbContext _dbContext;
-        private readonly CloudAdapter _adapter;
-        private readonly ILogger<WorkLogNotificationJob> _logger;
         private readonly INotificationService _notificationService;
-        private readonly ResiliencePipeline _notifyTeamsPipeLine;
-
-        private readonly string _appId;
-        private readonly string _serviceUrl;
-        private readonly string _tenantId;
-
+        private readonly INotificationTeamsService _notificationTeamsService;
 
         public WorkLogNotificationJob
         (
             WorkflowTimeDbContext dbContext,
-            CloudAdapter adapter,
             ILogger<WorkLogNotificationJob> logger,
             INotificationService notificationService,
-            IOptions<AzureAdOptions> azureAdOptions,
-            IOptions<MicrosoftAppOptions> microsoftAppOptions,
-            ResiliencePipelineProvider<string> pipelineProvider
-
+            INotificationTeamsService notificationTeamsService
         )
         {
             _dbContext = dbContext;
-            _adapter = adapter;
             _notificationService = notificationService;
-            _logger = logger;
-            _notifyTeamsPipeLine = pipelineProvider.GetPipeline("TeamsNotificationPipeLine");
-
-            _appId = microsoftAppOptions.Value.AppId;
-            _serviceUrl = microsoftAppOptions.Value.ServiceUrl;
-            _tenantId = azureAdOptions.Value.TenantId;
+            _notificationTeamsService = notificationTeamsService;
         }
 
         /// <summary>
@@ -83,7 +60,7 @@ namespace WorkflowTime.Features.NotificationsTeams
             ConcurrentBag<Notification> notifications = new ConcurrentBag<Notification>();
             var notifyTasks = usersToNotify.Select(async userId =>
             {
-                await NotifyOnTeams(userId, finalMessage);
+                await _notificationTeamsService.SendNotification(userId, finalMessage);
                 var note = new Notification(title, message, userId);
                 notifications.Add(note);
             });
@@ -94,7 +71,7 @@ namespace WorkflowTime.Features.NotificationsTeams
 
             var NotifyBySignalRTasks = notifications.Select(async notification =>
             {
-                await _notificationService.NotifySomething(notification.UserId, notification);
+                await _notificationService.SendNotification(notification.UserId, notification);
             });
 
             await Task.WhenAll(NotifyBySignalRTasks);
@@ -133,43 +110,6 @@ namespace WorkflowTime.Features.NotificationsTeams
                 .ToListAsync();
 
             return usersToNotify;
-        }
-
-        private async Task NotifyOnTeams(Guid userId, string finalMessage)
-        {
-            var conversationParameters = new ConversationParameters
-            {
-                IsGroup = false,
-                Bot = new ChannelAccount(_appId),
-                Members = new List<ChannelAccount>
-                {
-                        new ChannelAccount(id:$"{userId.ToString()}")
-                },
-                TenantId = _tenantId,
-                ChannelData = new { tenant = new { id = _tenantId } }
-            };
-
-            try
-            {
-                await _notifyTeamsPipeLine.ExecuteAsync(async ct =>
-                {
-                    await _adapter.CreateConversationAsync(
-                        _appId,
-                        "msteams",
-                        _serviceUrl,
-                        null,
-                        conversationParameters,
-                        async (turnContext, innerCt) =>
-                        {
-                            await turnContext.SendActivityAsync(finalMessage, cancellationToken: innerCt);
-                        },
-                        ct);
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error sending message to user {userId}");
-            }
         }
     }
 }

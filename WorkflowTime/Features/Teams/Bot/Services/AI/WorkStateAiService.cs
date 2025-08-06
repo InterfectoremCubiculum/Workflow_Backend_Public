@@ -7,7 +7,7 @@ using WorkflowTime.Features.Notifications.Services;
 using WorkflowTime.Features.WorkLog.Dtos;
 using WorkflowTime.Features.WorkLog.Services;
 
-namespace WorkflowTime.Features.Bot.Services.AI
+namespace WorkflowTime.Features.Teams.Bot.Services.AI
 {
     public class WorkStateAiService
     {
@@ -34,20 +34,20 @@ namespace WorkflowTime.Features.Bot.Services.AI
 
             var parameters = _mapper.Map<WorkflowActionResult, WorkflowParameters>(request);
             var TimeDiff = utc?.Offset;
-            if (TimeDiff is not null)
-            {
-                if (parameters.StartTime.HasValue)
-                {
-                    var local = new DateTimeOffset(parameters.StartTime.Value, (TimeSpan)TimeDiff);
-                    parameters.StartTime = local.UtcDateTime;
-                }
+            //if (TimeDiff is not null)
+            //{
+            //    if (parameters.StartTime.HasValue)
+            //    {
+            //        var local = new DateTimeOffset(parameters.StartTime.Value, (TimeSpan)TimeDiff);
+            //        parameters.StartTime = local.UtcDateTime;
+            //    }
 
-                if (parameters.EndTime.HasValue)
-                {
-                    var local = new DateTimeOffset(parameters.EndTime.Value, (TimeSpan)TimeDiff);
-                    parameters.EndTime = local.UtcDateTime;
-                }
-            }
+            //    if (parameters.EndTime.HasValue)
+            //    {
+            //        var local = new DateTimeOffset(parameters.EndTime.Value, (TimeSpan)TimeDiff);
+            //        parameters.EndTime = local.UtcDateTime;
+            //    }
+            //}
 
 
             string responseMessage;
@@ -64,7 +64,9 @@ namespace WorkflowTime.Features.Bot.Services.AI
 
                     case "EndWork":
                         var endTimeSegment = await _workLogService.EndWork(userId, parameters);
-                        var userEnd = ToUserOffset(endTimeSegment.StartTime, (TimeSpan)TimeDiff!);
+                        var userEnd = endTimeSegment.EndTime.HasValue
+                            ? ToUserOffset(endTimeSegment.EndTime.Value, (TimeSpan)TimeDiff!)
+                            : default;
                         responseMessage = $"Work session ended. {userEnd}";
                         await _hub.NotifyWorkStateChange(userId, null);
                         break;

@@ -1,7 +1,10 @@
-﻿namespace WorkflowTime.Features.Summary.Dtos
+﻿using CsvHelper.Configuration.Attributes;
+
+namespace WorkflowTime.Features.Summary.Dtos
 {
     public class UserWorkSummaryDto
     {
+        [Ignore]
         public Guid UserId { get; set; }
         public required string Name { get; set; }
         public string? TeamName { get; set; }

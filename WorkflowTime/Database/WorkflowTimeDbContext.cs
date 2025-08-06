@@ -3,6 +3,7 @@ using WorkflowTime.Features.DayOffs.Models;
 using WorkflowTime.Features.Notifications.Models;
 using WorkflowTime.Features.ProjectManagement.Models;
 using WorkflowTime.Features.TeamManagement.Models;
+using WorkflowTime.Features.Teams.Graph;
 using WorkflowTime.Features.UserManagment.Models;
 using WorkflowTime.Features.WorkLog.Models;
 
@@ -16,7 +17,6 @@ namespace WorkflowTime.Database
         public DbSet<UserModel> Users { get; set; }
         public DbSet<SettingModel> Settings { get; set; }
         public DbSet<TimeSegment> TimeSegments { get; set; }
-
         public DbSet<Notification> Notifications { get; set; }
         public WorkflowTimeDbContext(DbContextOptions<WorkflowTimeDbContext> options) : base(options) { }
 

@@ -1,7 +1,7 @@
 ﻿using Microsoft.Bot.Schema;
 using Newtonsoft.Json.Linq;
 
-namespace WorkflowTime.Features.Bot.Services
+namespace WorkflowTime.Features.Teams.Bot.Services.Commands
 {
     public class ConfirmationModal
     {

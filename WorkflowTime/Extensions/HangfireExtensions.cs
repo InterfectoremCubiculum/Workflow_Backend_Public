@@ -1,26 +1,26 @@
 ﻿using Hangfire;
 using WorkflowTime.Configuration;
 using WorkflowTime.Features.AdminPanel.Services;
-using WorkflowTime.Features.Bot.Services;
 using WorkflowTime.Features.DayOffs.Services;
 using WorkflowTime.Features.NotificationsTeams;
+using WorkflowTime.Features.Teams.Bot.Services;
+using WorkflowTime.Features.Teams.Graph;
 using WorkflowTime.Features.UserManagement.Services;
+using WorkflowTime.Features.WorkLog.Services;
 
 namespace WorkflowTime.Extensions
 {
     public static class HangfireExtensions
     {
         public static void ConfigureRecurringJobs(IServiceProvider services, TeamsOptions teams, ISettingsService settingsService)
-        {
-            var dailyThreadTime = settingsService.GetSettingByKey<TimeSpan>("daily_work_thread");
-            var notifStartTime = settingsService.GetSettingByKey<TimeSpan>("work_log_notification_start");
-            var notifEndTime = settingsService.GetSettingByKey<TimeSpan>("work_log_notification_end");
-
-            UpdateDailyWorkThread(services, teams, dailyThreadTime);
-            UpdateWorkLogNotificationStart(services, notifStartTime);
-            UpdateWorkLogNotificationEnd(services, notifEndTime);
+        {            
+            UpdateDailyWorkThread(services, teams, settingsService.GetSettingByKey<TimeSpan>("daily_work_thread"));
+            UpdateWorkLogNotificationStart(services, settingsService.GetSettingByKey<TimeSpan>("work_log_notification_start"));
+            UpdateWorkLogNotificationEnd(services, settingsService.GetSettingByKey<TimeSpan>("work_log_notification_end"));
             UserSync(services, settingsService);
             DaillyDayOffStateChange(services);
+            CheckUsersPresence(services, settingsService.GetSettingByKey<int>("check_presence_interval"));
+            SearchingAnomalies(services, settingsService.GetSettingByKey<int>("searching_anomalies_interval"));
         }
         public static void UpdateDailyWorkThread(IServiceProvider services, TeamsOptions teams, TimeSpan time)
         {
@@ -136,6 +136,32 @@ namespace WorkflowTime.Extensions
 
             return $"{time.Minutes} {time.Hours} {dayOfMonth} * *";
         }
+
+        public static void CheckUsersPresence(IServiceProvider services, int intervalInMinutes)
+        {
+            using var scope = services.CreateScope();
+            var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+
+            recurringJobManager.AddOrUpdate<PresensceManager>(
+                "check-users-presence",
+                job => job.CheckUsersPresence(),
+                cronExpression: $"0/{intervalInMinutes} * * * *",
+                new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc }
+            );
+        }
+
+        public static void SearchingAnomalies(IServiceProvider services, int intervalInMinutes)
+        {
+            using var scope = services.CreateScope();
+            var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+            recurringJobManager.AddOrUpdate<IAnomalyWorklogService>(
+                "searching-anomalies",
+                job => job.CheckDailyWorkLogAnomalies(),
+                cronExpression: $"0/{intervalInMinutes} * * * *",
+                new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc }
+            );
+        }
+
     }
 }
 

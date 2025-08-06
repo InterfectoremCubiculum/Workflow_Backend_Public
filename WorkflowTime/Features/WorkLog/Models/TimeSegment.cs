@@ -13,7 +13,9 @@ namespace WorkflowTime.Features.WorkLog.Models
         [Required]
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
+        public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
         public int? DurationInSeconds { get; private set; }
+        public bool RequestAction { get; set; } = false;
         public bool IsDeleted { get; set; } = false;
         [Required]
         public Guid UserId { get; set; }

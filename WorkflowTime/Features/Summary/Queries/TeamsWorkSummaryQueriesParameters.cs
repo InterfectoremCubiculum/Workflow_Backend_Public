@@ -5,5 +5,6 @@
         public DateOnly PeriodStart { get; set; }
         public DateOnly PeriodEnd { get; set; }
         public required List<int> TeamIds { get; set; }
+        public bool IsDayByDay { get; set; } = false;
     }
 }

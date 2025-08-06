@@ -1,6 +1,4 @@
-﻿using WorkflowTime.Features.Bot.Services.AI;
-
-namespace WorkflowTime.Features.Bot.Services
+﻿namespace WorkflowTime.Features.Teams.Bot.Services.AI
 {
     public interface IWorkflowAnalyzer
     {

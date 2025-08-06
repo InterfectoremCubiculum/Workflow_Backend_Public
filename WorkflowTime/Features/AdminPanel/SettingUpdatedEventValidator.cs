@@ -9,7 +9,14 @@
             "daily_work_thread",
             "work_log_notification_start",
             "work_log_notification_end",
-            "user_sync"
+            "user_sync",
+            "max_time_away",
+            "max_time_break",
+            "max_work_time",
+            "time_away_when_user_get_notification",
+            "max_reverse_registration_time_logged",
+            "max_reverse_registration_time",
+            "max_summarise_break_time"
         };
 
         public SettingUpdatedEventValidator()
@@ -36,6 +43,14 @@
                 case "user_sync":
                     return true;
 
+                case "max_time_away":
+                case "max_time_break":
+                case "max_work_time":
+                case "time_away_when_user_get_notification":
+                case "max_reverse_registration_time_logged":
+                case "max_reverse_registration_time":
+                case "max_summarise_break_time":
+                    return !string.IsNullOrEmpty(value) && int.TryParse(value, out _);
                 default:
                     return false;
             }

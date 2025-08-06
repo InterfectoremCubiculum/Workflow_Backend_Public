@@ -1,7 +1,7 @@
 ﻿{
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.14/MicrosoftTeams.schema.json",
   "manifestVersion": "1.14",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "id": "28cd7ef5-359c-4c5d-8b2e-081e44e62def",
   "packageName": "com.example.workflowtimebot",
   "developer": {
@@ -11,6 +11,7 @@
     "termsOfUseUrl": "https://yourcompany.com/terms"
   },
   "icons": {
+    "color": "icon-color.png",
     "color": "icon-color.png",
     "outline": "icon-outline.png"
   },
@@ -60,5 +61,23 @@
   ],
   "validDomains": [
     "living-joey-clear.ngrok-free.app"
-  ]
+  ],
+  "webApplicationInfo": {
+    "id": "28cd7ef5-359c-4c5d-8b2e-081e44e62def",
+    "resource": "api://botid-28cd7ef5-359c-4c5d-8b2e-081e44e62def"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "type": "Application",
+          "name": "ChannelMessage.Read.Group"
+        },
+        {
+          "type": "Application",
+          "name": "ChatMessage.Read.Chat"
+        }
+      ]
+    }
+  }
 }

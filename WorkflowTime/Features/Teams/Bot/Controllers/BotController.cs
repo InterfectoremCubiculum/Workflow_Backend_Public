@@ -3,7 +3,7 @@ using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Builder;
 using Microsoft.AspNetCore.Authorization;
 
-namespace WorkflowTime.Features.Bot.Controllers
+namespace WorkflowTime.Features.Teams.Bot.Controllers
 {
     /// <summary>
     /// Provides API endpoints for interacting with the bot service.

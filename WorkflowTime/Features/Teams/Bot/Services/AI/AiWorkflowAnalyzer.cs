@@ -2,7 +2,7 @@
 using System.Text.Json;
 using WorkflowTime.Enums;
 
-namespace WorkflowTime.Features.Bot.Services.AI
+namespace WorkflowTime.Features.Teams.Bot.Services.AI
 {
     /// <summary>
     ///  CLU (Conversational Language Understanding) not used any more.

@@ -10,6 +10,9 @@ using Microsoft.EntityFrameworkCore;
 using Polly.Registry;
 using Polly;
 using ZiggyCreatures.Caching.Fusion;
+using Microsoft.Extensions.Options;
+using WorkflowTime.Configuration;
+using WorkflowTime.Enums;
 
 namespace WorkflowTime.Features.UserManagement.Services
 {
@@ -21,6 +24,13 @@ namespace WorkflowTime.Features.UserManagement.Services
         private readonly IMapper _mapper;
         private readonly ResiliencePipeline _pipeline;
         private readonly IFusionCache _fusionCache;
+        private readonly MicrosoftAppOptions _options;
+        private readonly ILogger<UserSyncService> _logger;
+
+        private static readonly Guid Admin = new Guid("746a6c20-c038-4635-91ff-d9def6d29b16");
+        private static readonly Guid User = new Guid("0cbb5633-864d-40cc-934f-2c296d238f6f");
+
+
         public UserSyncService
         (
             WorkflowTimeDbContext dbContext,
@@ -28,7 +38,9 @@ namespace WorkflowTime.Features.UserManagement.Services
             DeltaLinkService deltaLinkService,
             IMapper mapper,
             ResiliencePipelineProvider<string> pipeline,
-            IFusionCache fusionCache
+            IFusionCache fusionCache,
+            IOptions<MicrosoftAppOptions> options,
+            ILogger<UserSyncService> logger
         )
         {
             _dbContext = dbContext;
@@ -37,6 +49,8 @@ namespace WorkflowTime.Features.UserManagement.Services
             _mapper = mapper;
             _pipeline = pipeline.GetPipeline("GraphUserSync");
             _fusionCache = fusionCache;
+            _options = options.Value;
+            _logger = logger;
         }
 
         public async Task Sync()
@@ -129,13 +143,57 @@ namespace WorkflowTime.Features.UserManagement.Services
                 await _deltaLinkService.SaveDeltaLink(deltaGetResponse.OdataNextLink);
             }
             await _dbContext.SaveChangesAsync();
-            
-            var userIds = await _dbContext.Users
-                .Where(u => !u.IsDeleted)
-                .Select(u => u.Id)
-                .ToListAsync();
+
+            await SyncUsersRoles();
 
             await _fusionCache.RemoveByTagAsync("Users");
+        }
+
+        private async Task SyncUsersRoles()
+        {
+            try { 
+                var users = await _dbContext.Users.Where(u => !u.IsDeleted)
+                    .ToListAsync();
+                var sp = await _graphClient.ServicePrincipals
+                .GetAsync(req =>
+                {
+                    req.QueryParameters.Filter = $"appId eq '{_options.AppId}'";
+                });
+
+                var resourceId = sp.Value.FirstOrDefault()?.Id;
+
+                foreach (var user in users)
+                {
+                    var appRoleAssignments = await _graphClient.Users[user.Id.ToString()]
+                        .AppRoleAssignments
+                        .GetAsync(requestConfiguration =>
+                        {
+                            requestConfiguration.QueryParameters.Filter = $"resourceId eq {resourceId}"; ;
+                            requestConfiguration.QueryParameters.Select = new[] { "appRoleId"};
+                        });
+
+                    if (appRoleAssignments?.Value != null && appRoleAssignments.Value.Count > 0)
+                    {
+                        if (appRoleAssignments?.Value != null && appRoleAssignments.Value.Count > 0)
+                        {
+                            var appRoleId = appRoleAssignments.Value.FirstOrDefault()?.AppRoleId;
+                            if (appRoleId == Admin)
+                                user.Role = UserRole.Admin;
+                            else if (appRoleId == User)
+                                user.Role = UserRole.User;
+                            else
+                                user.Role = UserRole.None;
+                        }
+                    }
+                }
+
+                _dbContext.UpdateRange(users);
+                _dbContext.SaveChanges();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error in SyncUsersRoles.");
+            }
         }
     }
 }

@@ -1,22 +1,22 @@
-﻿using Microsoft.Bot.Builder.Integration.AspNet.Core;
+﻿using Microsoft.AspNetCore.SignalR;
 using Microsoft.Bot.Builder;
-using Microsoft.Bot.Connector.Authentication;
-using WorkflowTime.Features.Bot;
-using WorkflowTime.Features.Bot.Services;
+using Microsoft.Bot.Builder.Integration.AspNet.Core;
+using WorkflowTime.Features.AdminPanel.Services;
 using WorkflowTime.Features.DayOffs.Services;
 using WorkflowTime.Features.DeltaLink;
+using WorkflowTime.Features.Hubs;
+using WorkflowTime.Features.Notifications.Services;
+using WorkflowTime.Features.NotificationsTeams;
 using WorkflowTime.Features.ProjectManagement.Services;
+using WorkflowTime.Features.Summary.Services;
 using WorkflowTime.Features.TeamManagement.Services;
+using WorkflowTime.Features.Teams.Bot;
+using WorkflowTime.Features.Teams.Bot.Services;
+using WorkflowTime.Features.Teams.Bot.Services.AI;
+using WorkflowTime.Features.Teams.Bot.Services.Commands;
+using WorkflowTime.Features.Teams.Graph;
 using WorkflowTime.Features.UserManagement.Services;
 using WorkflowTime.Features.WorkLog.Services;
-using Microsoft.AspNetCore.SignalR;
-using WorkflowTime.Features.Hubs;
-using WorkflowTime.Features.NotificationsTeams;
-using WorkflowTime.Features.AdminPanel.Services;
-using WorkflowTime.Features.Bot.Services.AI;
-using WorkflowTime.Features.Summary.Services;
-using WorkflowTime.Features.Notifications.Services;
-using Polly;
 
 namespace WorkflowTime.Extensions
 {
@@ -34,10 +34,9 @@ namespace WorkflowTime.Extensions
             services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddScoped<IUserSyncService, UserSyncService>();
             services.AddScoped<ISummaryService, SummaryService>();
-            services.AddScoped<ISummaryCached, SummaryCached>();
             services.AddScoped<ISettingsService, SettingsService>();
 
-            services.AddScoped<WorkStateCommnadService>();
+            services.AddScoped<WorkStateCommandService>();
             services.AddScoped<WorkStateAiService>();
             //services.AddSingleton<BotFrameworkAuthentication, ConfigurationBotFrameworkAuthentication>();
             services.AddSingleton<CloudAdapter, AdapterWithErrorHandler>();
@@ -53,6 +52,9 @@ namespace WorkflowTime.Extensions
             services.AddSingleton<IUserIdProvider, NameIdentifierUserIdProvider>();
 
             services.AddScoped<INotificationService, NotificationService>();
+            services.AddScoped<INotificationTeamsService, NotificationTeamsService>();
+            services.AddScoped<IAnomalyWorklogService, AnomalyWorklogService>();
+            services.AddScoped<PresensceManager>();
             return services;
         }
     }

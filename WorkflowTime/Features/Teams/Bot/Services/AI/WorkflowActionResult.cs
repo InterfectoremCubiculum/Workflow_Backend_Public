@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace WorkflowTime.Features.Bot.Services.AI
+namespace WorkflowTime.Features.Teams.Bot.Services.AI
 {
     public class WorkflowActionResult
     {

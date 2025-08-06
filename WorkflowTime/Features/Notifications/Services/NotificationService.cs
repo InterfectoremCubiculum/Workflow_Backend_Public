@@ -1,14 +1,19 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Graph.Models;
 using Polly;
 using Polly.Registry;
 using WorkflowTime.Database;
+using WorkflowTime.Enums;
 using WorkflowTime.Features.Hubs;
 using WorkflowTime.Features.Notifications.Models;
 
 namespace WorkflowTime.Features.Notifications.Services
 {
+    /// <summary>
+    /// SingalR
+    /// </summary>
     public class NotificationService : INotificationService
     {
         private readonly IHubContext<SignalRHub> _hubContext;
@@ -54,6 +59,7 @@ namespace WorkflowTime.Features.Notifications.Services
                     Message = n.Message,
                     CreatedAt = n.CreatedAt,
                 })
+                .OrderByDescending( n => n.CreatedAt)
                 .ToListAsync();
 
             return results;
@@ -69,7 +75,7 @@ namespace WorkflowTime.Features.Notifications.Services
             return _dbContext.SaveChangesAsync();
         }
 
-        public async Task NotifySomething(Guid userId, SendedNotificationDto notToSend)
+        public async Task SendNotification(Guid userId, SendedNotificationDto notToSend)
         {
             try
             {
@@ -84,15 +90,15 @@ namespace WorkflowTime.Features.Notifications.Services
                 _logger.LogError(ex, "Error sending notification to user {UserId}", userId);
             }
         }
-        public async Task NotifySomething(Guid userId, Notification notToSend)
+        public async Task SendNotification(Guid userId, Notification noteToSend)
         {
-            var mappedNote = _mapper.Map<SendedNotificationDto>(notToSend);
+            var mappedNote = _mapper.Map<SendedNotificationDto>(noteToSend);
             try 
             {
                 await _notifyPipeLine.ExecuteAsync(async (ct) =>
                 {
                     await _hubContext.Clients.User(userId.ToString())
-                        .SendAsync("notifyClient", notToSend, ct);
+                        .SendAsync("notifyClient", mappedNote, ct);
                 });
             }
             catch (Exception ex)
@@ -121,6 +127,35 @@ namespace WorkflowTime.Features.Notifications.Services
             {
                 _logger.LogError(ex, "Error sending work state change to user {UserId}", userId);
             }
+        }
+
+        public async Task CreateNotificationsBatch(UserRole? userToInformRole, Notification notification)
+        {
+            var users = await _dbContext.Users
+                .Where(u => u.Role == userToInformRole && !u.IsDeleted)
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            List<Notification> notifications = new List<Notification>();
+
+            foreach (var userId in users)
+            {
+                notifications.Add(new Notification
+                (
+                    notification.Title,
+                    notification.Message,
+                    userId
+                ));
+            }
+
+            _dbContext.Notifications.AddRange(notifications);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        public async Task SendNotification(UserRole userToInformRole, Notification noteToSend)
+        {
+            var mappedNote = _mapper.Map<SendedNotificationDto>(noteToSend);
+            await _hubContext.Clients.Group($"group_{userToInformRole}").SendAsync("notifyClient", mappedNote);
         }
     }
 }

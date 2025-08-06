@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.Graph.Models;
+using System.ComponentModel.DataAnnotations;
 using WorkflowTime.Features.UserManagment.Models;
 
 namespace WorkflowTime.Features.Notifications.Models
@@ -17,6 +18,14 @@ namespace WorkflowTime.Features.Notifications.Models
         public Notification(string? title, string? message, Guid userId)
         {
             UserId = userId;
+            Title = title;
+            Message = message;
+            CreatedAt = DateTime.UtcNow;
+            IsRead = false;
+        }
+
+        public Notification(string? title, string? message)
+        {
             Title = title;
             Message = message;
             CreatedAt = DateTime.UtcNow;

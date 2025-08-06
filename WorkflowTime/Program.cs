@@ -1,25 +1,25 @@
-using Microsoft.AspNetCore.OData;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Logging;
-using System.Text.Json.Serialization;
-using WorkflowTime.Database;
-using WorkflowTime.Features.OdData;
-using WorkflowTime.Mappers;
-using WebApplication = Microsoft.AspNetCore.Builder.WebApplication;
-using WorkflowTime.Extensions;
+using Hangfire;
 using Hellang.Middleware.ProblemDetails;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
-using Hangfire;
-using WorkflowTime.Features.AdminPanel.Services;
-using WorkflowTime.Features.AdminPanel;
-using WorkflowTime.Configuration;
-using System.Threading.RateLimiting;
-using System.Security.Claims;
-using Polly;
+using Microsoft.AspNetCore.OData;
 using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Connector.Authentication;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Logging;
+using Polly;
+using System.Security.Claims;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using WorkflowTime.Configuration;
+using WorkflowTime.Database;
+using WorkflowTime.Extensions;
+using WorkflowTime.Features.AdminPanel;
+using WorkflowTime.Features.AdminPanel.Services;
+using WorkflowTime.Features.OdData;
+using WorkflowTime.Mappers;
+using WebApplication = Microsoft.AspNetCore.Builder.WebApplication;
 
 namespace WorkflowTime
 {
@@ -32,23 +32,23 @@ namespace WorkflowTime
 
             // Add services to the container.
             builder.Services.AddControllers(options =>
-            {
-                var policy = new AuthorizationPolicyBuilder()
-                    .AddAuthenticationSchemes(CookieAuthenticationDefaults.AuthenticationScheme)
-                    .RequireAuthenticatedUser()
-                    .Build();
-                options.Filters.Add(new AuthorizeFilter(policy));
-            })
-                .AddJsonOptions(options =>
-                {
-                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-                })
-                .AddOData(opt =>
-                    opt.AddRouteComponents("odata", EdmModelProvider.GetEdmModel())
-                    .Select()
-                    .Filter()
-                    .OrderBy()
-                    .Expand());
+             {
+                 var policy = new AuthorizationPolicyBuilder()
+                     .AddAuthenticationSchemes(CookieAuthenticationDefaults.AuthenticationScheme)
+                     .RequireAuthenticatedUser()
+                     .Build();
+                 options.Filters.Add(new AuthorizeFilter(policy));
+             })
+                 .AddJsonOptions(options =>
+                 {
+                     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                 })
+                 .AddOData(opt =>
+                     opt.AddRouteComponents("odata", EdmModelProvider.GetEdmModel())
+                     .Select()
+                     .Filter()
+                     .OrderBy()
+                     .Expand());
 
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
@@ -129,7 +129,7 @@ namespace WorkflowTime
                 options.AddPolicy("AllowSpecificOrigins", builder =>
                 {
                     builder
-                    .WithOrigins("http://localhost:3000", "https://localhost:7241", " https://living-joey-clear.ngrok-free.app", "http://localhost:5100")
+                    .WithOrigins("http://localhost:3000", "https://localhost:7241", " https://living-joey-clear.ngrok-free.app", "http://localhost:5100", "https://blue-flower-0651b0a03.2.azurestaticapps.net")
                     .AllowAnyMethod()
                     .AllowAnyHeader()
                     .AllowCredentials();
@@ -154,6 +154,7 @@ namespace WorkflowTime
 
             var app = builder.Build();
             app.Use(async (context, next) =>
+            
             {
                 Console.WriteLine($"Request: {context.Request.Method} {context.Request.Path}");
                 await next();
@@ -163,7 +164,7 @@ namespace WorkflowTime
 
                 IdentityModelEventSource.ShowPII = true;
                 IdentityModelEventSource.LogCompleteSecurityArtifact = true;
-                
+
                 app.UseHangfireDashboard("/hangfire");
 
                 app.UseSwagger();
@@ -180,11 +181,8 @@ namespace WorkflowTime
             using var scope = app.Services.CreateScope();
             var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
 
-            var teamsOptions = configuration.GetSection("Teams").Get<TeamsOptions>();
-            HangfireExtensions.ConfigureRecurringJobs(app.Services, teamsOptions, settingsService);
-
             app.AddApplicationHubs();
-            
+
             app.UseProblemDetails();
 
             //app.UseHttpsRedirection();
@@ -197,6 +195,9 @@ namespace WorkflowTime
 
             app.MapControllers()
                 .RequireRateLimiting("PerUserPolicy");
+
+            var teamsOptions = configuration.GetSection("Teams").Get<TeamsOptions>();
+            HangfireExtensions.ConfigureRecurringJobs(app.Services, teamsOptions, settingsService);
 
             app.Run();
         }

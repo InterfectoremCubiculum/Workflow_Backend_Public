@@ -1,7 +1,7 @@
 ﻿using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Connector.Authentication;
 
-namespace WorkflowTime.Features.Bot
+namespace WorkflowTime.Features.Teams.Bot
 {
     public class AdapterWithErrorHandler : CloudAdapter
     {

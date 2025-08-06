@@ -3,7 +3,7 @@ using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Options;
 using WorkflowTime.Configuration;
 
-namespace WorkflowTime.Features.Bot.Services
+namespace WorkflowTime.Features.Teams.Bot.Services
 {
     public class ScheduledMessageService
     {

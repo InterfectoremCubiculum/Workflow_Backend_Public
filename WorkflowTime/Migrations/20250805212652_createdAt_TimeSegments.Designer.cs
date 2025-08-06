@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WorkflowTime.Database;
 
@@ -11,9 +12,11 @@ using WorkflowTime.Database;
 namespace WorkflowTime.Migrations
 {
     [DbContext(typeof(WorkflowTimeDbContext))]
-    partial class WorkflowTimeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250805212652_createdAt_TimeSegments")]
+    partial class createdAt_TimeSegments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

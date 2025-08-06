@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WorkflowTime.Enums;
 using WorkflowTime.Features.UserManagement.Services;
 using WorkflowTime.Features.WorkLog.Dtos;
 using WorkflowTime.Features.WorkLog.Queries;
@@ -155,6 +156,14 @@ namespace WorkflowTime.Features.WorkLog.Controllers
         {
             var result = await _workLogService.WidgetSync(_currentUserService.UserId);
             return Ok(result);
+        }
+
+        [Authorize(Policy = "OnlyAdministratorAccess")]
+        [HttpPut("ResolveActionRequest")]
+        public async Task<IActionResult> ResolveActionRequest([FromQuery] int timeSegmentId, [FromBody] ResolveActionCommand action)
+        {
+            await _workLogService.ResolveActionRequest(timeSegmentId, action);
+            return Ok("Action request resolved successfully.");
         }
     }
 }

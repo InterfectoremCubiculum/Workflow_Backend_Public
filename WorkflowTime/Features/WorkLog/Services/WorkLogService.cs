@@ -1,10 +1,14 @@
 ﻿using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Graph.Models;
 using System.ComponentModel.DataAnnotations;
 using WorkflowTime.Database;
 using WorkflowTime.Enums;
 using WorkflowTime.Exceptions;
+using WorkflowTime.Features.AdminPanel.Services;
+using WorkflowTime.Features.Notifications.Models;
+using WorkflowTime.Features.Notifications.Services;
 using WorkflowTime.Features.WorkLog.Dtos;
 using WorkflowTime.Features.WorkLog.Models;
 using WorkflowTime.Features.WorkLog.Queries;
@@ -15,25 +19,45 @@ namespace WorkflowTime.Features.WorkLog.Services
     {
         private readonly WorkflowTimeDbContext _dbContext;
         private readonly IMapper _mapper;
+        private readonly int _maxReverseRegistrationTime;
+        private readonly int _maxReverseregistrationTimeLogged;
+        private readonly INotificationService _notificationService;
+        private readonly INotificationTeamsService _notificationTeamsService;
 
-        public WorkLogService(IMapper mapper, WorkflowTimeDbContext dbContext)
+        public WorkLogService
+        (
+            IMapper mapper, WorkflowTimeDbContext dbContext, 
+            ISettingsService settingsService,
+            INotificationService notificationService,
+            INotificationTeamsService notificationTeamsService
+        )
         {
             _mapper = mapper;
             _dbContext = dbContext;
+            _maxReverseRegistrationTime = settingsService.GetSettingByKey<int>("max_reverse_registration_time");
+            _maxReverseregistrationTimeLogged = settingsService.GetSettingByKey<int>("max_reverse_registration_time_logged");
+            _notificationService = notificationService;
+            _notificationTeamsService = notificationTeamsService;
         }
         public async Task<TimeSegment> StartWork(Guid userId, WorkflowParameters? parameters)
         {
-            var activeSegment = await GetActiveSegment(userId);
-            if (activeSegment != null)
+            var lastSegment = await GetLastSegment(userId);
+            if (lastSegment != null && lastSegment.EndTime == null)
             {
-                throw new ConflictException($"There is active segment of type {activeSegment.TimeSegmentType}. First end this segment to Start Work.");
+                throw new ConflictException($"There is active segment of type {lastSegment.TimeSegmentType}. First end this segment to Start Work.");
             }
-
             var now = DateTime.UtcNow;
             var proposedStartTime = parameters?.StartTime ?? now;
-            if (proposedStartTime < now.AddHours(-1))
+            var proposedEndTime = parameters?.EndTime;
+
+            if (lastSegment != null && proposedStartTime < lastSegment.EndTime)
             {
-                throw new ValidationException($"Start Time ({proposedStartTime:yyyy-MM-dd HH:mm:ss}) cannot be earlier than one hour before now ({now:yyyy-MM-dd HH:mm:ss}).");
+                throw new ValidationException($"Proposed segment overlaps with the last segment. Start Time ({proposedStartTime:yyyy-MM-dd HH:mm:ss}) must be after last segment's End Time ({lastSegment.EndTime:yyyy-MM-dd HH:mm:ss}).");
+            }
+
+            if (proposedStartTime < now.AddMinutes(-_maxReverseRegistrationTime))
+            {
+                throw new ValidationException($"Start Time ({proposedStartTime:yyyy-MM-dd HH:mm:ss}) cannot be earlier than {_maxReverseRegistrationTime} minutes before now ({now:yyyy-MM-dd HH:mm:ss}).");
             }
 
             var newSegment = new TimeSegment
@@ -43,7 +67,7 @@ namespace WorkflowTime.Features.WorkLog.Services
                 StartTime = proposedStartTime,
                 EndTime = parameters?.EndTime ?? null
             };
-
+            newSegment = await HandleAdminRequestNeeded(proposedStartTime, newSegment, userId);
             _dbContext.TimeSegments.Add(newSegment);
             await _dbContext.SaveChangesAsync();
             return newSegment;
@@ -56,10 +80,6 @@ namespace WorkflowTime.Features.WorkLog.Services
             {
                 throw new ConflictException("You need to Start Work to End Work.");
             }
-            else if (activeSegment.TimeSegmentType != TimeSegmentType.Work)
-            {
-                throw new ConflictException("Cannot End Work when not on a Work segment. (First End your Break)");
-            }
 
             var now = DateTime.UtcNow;
             var proposedEndTime = parameters?.EndTime ?? now;
@@ -69,9 +89,11 @@ namespace WorkflowTime.Features.WorkLog.Services
                 throw new ValidationException("End Time cannot be earlier than StartTime.");
             }
 
-            if (proposedEndTime > now.AddHours(1))
+            //if (proposedEndTime > now.AddMinutes(_maxReverseRegistrationTime))
+
+            if (proposedEndTime > now)
             {
-                throw new ValidationException($"End Time ({proposedEndTime:yyyy-MM-dd HH:mm:ss}) cannot be more than 1 hour ahead of current time ({now:yyyy-MM-dd HH:mm:ss}).");
+                throw new ValidationException($"End Time ({proposedEndTime:yyyy-MM-dd HH:mm:ss}) cannot be more than ahead of current time ({now:yyyy-MM-dd HH:mm:ss}).");
             }
 
             activeSegment.EndTime = proposedEndTime;
@@ -96,9 +118,9 @@ namespace WorkflowTime.Features.WorkLog.Services
             var now = DateTime.UtcNow;
             var proposedStartTime = parameters?.StartTime ?? now;
 
-            if (proposedStartTime < now.AddHours(-1))
+            if (proposedStartTime < now.AddMinutes(-_maxReverseRegistrationTime))
             {
-                throw new ValidationException("Start Time of break cannot be earlier than 1 hour before the current time.");
+                throw new ValidationException($"Start Time of break cannot be earlier than {_maxReverseRegistrationTime} minutes before the current time.");
             }
 
             if (proposedStartTime < activeSegment.StartTime)
@@ -116,6 +138,7 @@ namespace WorkflowTime.Features.WorkLog.Services
                 StartTime = proposedStartTime,
                 EndTime = parameters?.EndTime ?? null
             };
+            newSegment = await HandleAdminRequestNeeded(proposedStartTime, newSegment, userId);
 
             _dbContext.TimeSegments.Add(newSegment);
             await _dbContext.SaveChangesAsync();
@@ -137,9 +160,9 @@ namespace WorkflowTime.Features.WorkLog.Services
             var now = DateTime.UtcNow;
             var proposedStartTime = parameters?.StartTime ?? now;
 
-            if (proposedStartTime < now.AddHours(-1))
+            if (proposedStartTime < now.AddMinutes(-_maxReverseRegistrationTime))
             {
-                throw new ValidationException("Start Time cannot be earlier than 1 hour before the current time.");
+                throw new ValidationException($"Start Time cannot be earlier than {_maxReverseRegistrationTime} minutes before the current time.");
             }
 
             if (proposedStartTime < activeSegment.StartTime)
@@ -157,10 +180,14 @@ namespace WorkflowTime.Features.WorkLog.Services
                 StartTime = proposedStartTime,
                 EndTime = parameters?.EndTime ?? null
             };
+            newSegment = await HandleAdminRequestNeeded(proposedStartTime, newSegment, userId);
 
-            if (newSegment.EndTime.HasValue && newSegment.EndTime > now.AddHours(1))
+            //if (newSegment.EndTime.HasValue && newSegment.EndTime > now.AddMinutes(-_maxReverseRegistrationTime))
+
+
+            if (newSegment.EndTime.HasValue && newSegment.EndTime > now)
             {
-                throw new ValidationException("End Time cannot be more than 1 hour in the future.");
+                throw new ValidationException("End Time cannot be in the future.");
             }
 
             _dbContext.TimeSegments.Add(newSegment);
@@ -183,7 +210,7 @@ namespace WorkflowTime.Features.WorkLog.Services
             if (segmentType.HasValue)
                 query = query.Where(ts => ts.TimeSegmentType == segmentType);
 
-            var lastSegment = await query.OrderByDescending(ts => ts.StartTime).FirstOrDefaultAsync() 
+            var lastSegment = await GetLastSegment(userId)
                 ?? throw new NotFoundException("No matching time segment found for editing.");
 
             if (parameters.AddTime.HasValue)
@@ -205,15 +232,15 @@ namespace WorkflowTime.Features.WorkLog.Services
             if (parameters.StartTime.HasValue)
             {
                 var startTime = parameters.StartTime.Value;
-                if (startTime < now.AddHours(-1) || startTime > now.AddHours(1))
-                    throw new ValidationException("StartTime out of allowed range.");
+                if (startTime < now.AddMinutes(-_maxReverseRegistrationTime) || startTime > now.AddMinutes(_maxReverseRegistrationTime))
+                    throw new ValidationException($"StartTime out of allowed range. {startTime}");
                 lastSegment.StartTime = startTime;
             }
 
             if (parameters.EndTime.HasValue)
             {
                 var endTime = parameters.EndTime.Value;
-                if (endTime < now.AddHours(-1) || endTime > now.AddHours(1))
+                if (endTime  < now.AddMinutes(-_maxReverseRegistrationTime) || endTime > now.AddMinutes(_maxReverseRegistrationTime))
                     throw new ValidationException("End Time out of allowed range.");
                 lastSegment.EndTime = endTime;
             }
@@ -264,44 +291,101 @@ namespace WorkflowTime.Features.WorkLog.Services
             var team = await _dbContext.Teams.FindAsync(parameters.GroupId)
                 ?? throw new NotFoundException($"Team with Id: {parameters.GroupId} not found.");
 
-            var timeSegments = await _dbContext.TimeSegments
-                .Include(ts => ts.User)
-                .Where(ts => !ts.IsDeleted
-                    && ts.StartTime >= parameters.DateFrom.ToDateTime(TimeOnly.MinValue)
-                    && (ts.EndTime == null || ts.EndTime <= parameters.DateTo.ToDateTime(TimeOnly.MaxValue))
-                    && ts.User.TeamId.HasValue 
-                    && ts.User.TeamId == parameters.GroupId)
-                    .ProjectTo<UsersTimelineWorklogDto>(_mapper.ConfigurationProvider)
-            .ToListAsync();
+            var usersInTeam = await _dbContext.Users
+                .Where(u => u.TeamId == parameters.GroupId && !u.IsDeleted)
+                .ToListAsync();
+
+            if (!usersInTeam.Any())
+            {
+                return new TeamInTimeLineDto
+                {
+                    Id = team.Id,
+                    Name = team.Name,
+                    TimeLines = new List<UsersTimelineWorklogDto>()
+                };
+            }
+
+            var userIds = usersInTeam.Select(u => u.Id).ToList();
+
+            var filteredTimeSegments = await _dbContext.TimeSegments
+                .Where(ts =>
+                    userIds.Contains(ts.UserId) &&
+                    !ts.IsDeleted &&
+                    ts.StartTime >= parameters.DateFrom.ToDateTime(TimeOnly.MinValue) &&
+                    (ts.EndTime == null || ts.EndTime <= parameters.DateTo.ToDateTime(TimeOnly.MaxValue)))
+                .ToListAsync();
+
+            var timeSegmentDtos = filteredTimeSegments
+                .Select(ts => new UsersTimelineWorklogDto
+                {
+                    Id = ts.Id,
+                    TimeSegmentType = ts.TimeSegmentType,
+                    StartTime = ts.StartTime,
+                    EndTime = ts.EndTime,
+                    DurationInSeconds = ts.DurationInSeconds,
+                    UserId = ts.UserId,
+                    RequestAction = ts.RequestAction,
+                    CreatedAt = ts.CreatedAt,
+                })
+                .ToList();
 
             var teamInTimeline = new TeamInTimeLineDto
             {
                 Id = team.Id,
                 Name = team.Name,
-                TimeLines = timeSegments
+                TimeLines = timeSegmentDtos
             };
+
             return teamInTimeline;
         }
+
 
         public async Task<ProjectInTimeLineDto> ProjectTimelineWorklog(GroupTimelineWorklogQueryParameters parameters)
         {
             var project = await _dbContext.Projects.FindAsync(parameters.GroupId)
                 ?? throw new NotFoundException($"Project with Id: {parameters.GroupId} not found.");
 
-            var timeSegments = await _dbContext.TimeSegments
-                .Include(ts => ts.User)
-                .Where(ts => !ts.IsDeleted
-                    && ts.StartTime >= parameters.DateFrom.ToDateTime(TimeOnly.MinValue)
-                    && (ts.EndTime == null || ts.EndTime <= parameters.DateTo.ToDateTime(TimeOnly.MaxValue))
-                    && ts.User.ProjectId.HasValue
-                    && ts.User.ProjectId == parameters.GroupId)
-                    .ProjectTo<UsersTimelineWorklogDto>(_mapper.ConfigurationProvider)
-                    .ToListAsync();
+            var usersInProject = await _dbContext.Users
+                .Where(u => u.ProjectId == parameters.GroupId && !u.IsDeleted)
+                .ToListAsync();
+
+            if (!usersInProject.Any())
+            {
+                var emptyProject = _mapper.Map<ProjectInTimeLineDto>(project);
+                emptyProject.TimeLines = new List<UsersTimelineWorklogDto>();
+                return emptyProject;
+            }
+
+            var userIds = usersInProject.Select(u => u.Id).ToList();
+
+            var filteredTimeSegments = await _dbContext.TimeSegments
+                .Where(ts =>
+                    userIds.Contains(ts.UserId) &&
+                    !ts.IsDeleted &&
+                    ts.StartTime >= parameters.DateFrom.ToDateTime(TimeOnly.MinValue) &&
+                    (ts.EndTime == null || ts.EndTime <= parameters.DateTo.ToDateTime(TimeOnly.MaxValue)))
+                .ToListAsync();
+
+            var timeSegmentDtos = filteredTimeSegments
+                .Select(ts => new UsersTimelineWorklogDto
+                {
+                    Id = ts.Id,
+                    TimeSegmentType = ts.TimeSegmentType,
+                    StartTime = ts.StartTime,
+                    EndTime = ts.EndTime,
+                    DurationInSeconds = ts.DurationInSeconds,
+                    UserId = ts.UserId,
+                    RequestAction = ts.RequestAction,
+                    CreatedAt = ts.CreatedAt,
+                })
+                .ToList();
 
             var projectInTimeline = _mapper.Map<ProjectInTimeLineDto>(project);
-            projectInTimeline.TimeLines = timeSegments;
+            projectInTimeline.TimeLines = timeSegmentDtos;
+
             return projectInTimeline;
         }
+
 
         public async Task<TimeSegmentType?> GetUserActiveTimeSegmentType(Guid userId)
         {
@@ -338,6 +422,109 @@ namespace WorkflowTime.Features.WorkLog.Services
                 .OrderByDescending(ts => ts.StartTime)
                 .FirstOrDefaultAsync();
         }
+        private async Task<TimeSegment?> GetLastSegment(Guid userId)
+        {
+            return await _dbContext.TimeSegments
+                .Where(ts => ts.UserId == userId && ts.EndTime != null && ts.IsDeleted == false)
+                .OrderByDescending(ts => ts.StartTime)
+                .FirstOrDefaultAsync();
+        }
+        public async Task<List<TimeSegment>> StartBreakForUsers(List<Guid> userIds, DateTime? startTime)
+        {
+            var now = DateTime.UtcNow;
+            var proposedStartTime = startTime ?? now;
+            if (proposedStartTime < now.AddMinutes(-_maxReverseRegistrationTime))
+            {
+                throw new ValidationException("Start Time of break cannot be earlier than 1 hour before the current time.");
+            }
 
+            var activeSegments = await _dbContext.TimeSegments
+                .Where(ts => userIds.Contains(ts.UserId) && ts.EndTime == null && ts.IsDeleted == false)
+                .ToListAsync();
+
+            var result = new List<TimeSegment>();
+
+            foreach (var userId in userIds)
+            {
+                var activeSegment = activeSegments.FirstOrDefault(ts => ts.UserId == userId);
+
+                if (activeSegment == null)
+                {
+                    continue;
+                }
+                if (activeSegment.TimeSegmentType == TimeSegmentType.Break)
+                {
+                    continue;
+                }
+                if (proposedStartTime < activeSegment.StartTime)
+                {
+                    continue;
+                }
+
+                activeSegment.EndTime = proposedStartTime;
+                _dbContext.TimeSegments.Update(activeSegment);
+
+                var newSegment = new TimeSegment
+                {
+                    UserId = userId,
+                    TimeSegmentType = TimeSegmentType.Break,
+                    StartTime = proposedStartTime,
+                    EndTime = null
+                };
+
+                _dbContext.TimeSegments.Add(newSegment);
+                result.Add(newSegment);
+            }
+
+            await _dbContext.SaveChangesAsync();
+            return result;
+        }
+
+        public async Task ResolveActionRequest(int TimeSegmentId, ResolveActionCommand action)
+        {
+            TimeSegment timeSegment = await _dbContext.TimeSegments.FindAsync(TimeSegmentId) 
+                ?? throw new NotFoundException($"TimeSegment with Id: {TimeSegmentId} not found.");
+
+            switch (action)
+            {
+                
+                case ResolveActionCommand.Reject:
+                    timeSegment.RequestAction = false;
+                    timeSegment.IsDeleted = true;
+                    break;
+                case ResolveActionCommand.Approve:
+                    timeSegment.RequestAction = false;
+                    break;
+                case ResolveActionCommand.SetStartTimeAsCreationDate:
+                    timeSegment.RequestAction = false;
+                    timeSegment.StartTime = timeSegment.CreatedAt ?? throw new ValidationException("CreatedAt cannot be null."); ;
+                    break;
+                default:
+                    throw new ValidationException("Invalid action command.");
+            }
+
+            _dbContext.TimeSegments.Update(timeSegment);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        private async Task<TimeSegment> HandleAdminRequestNeeded(DateTime proposed, TimeSegment segment, Guid userId)
+        {
+
+            var now = DateTime.UtcNow;
+            if (proposed < now.AddMinutes(-_maxReverseregistrationTimeLogged))
+            {
+                var user = await _dbContext.Users.FindAsync(userId)
+                    ?? throw new NotFoundException($"User with Id: {userId} not found.");
+                string message = $"User {user.GivenName} {user.Surname} ({userId}) has requested to log time before the allowed limit.";
+                
+                segment.RequestAction=true;
+                await _notificationTeamsService.SendNotification(UserRole.Admin, message);
+
+                Notification note = new Notification("Admin Approval Needed", message);
+                await _notificationService.CreateNotificationsBatch(UserRole.Admin, note);
+                await _notificationService.SendNotification(UserRole.Admin, note);
+            }
+            return segment;
+        }
     }
 }
